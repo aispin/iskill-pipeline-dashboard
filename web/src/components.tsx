@@ -128,6 +128,20 @@ export function Timeline({ events, manifest }: { events: Ev[]; manifest: Manifes
                       : "bg-zinc-100 text-zinc-400")
                 }
               >
+                {isActive && (
+                  <motion.span
+                    className="absolute -inset-1.5 rounded-full border-2 border-brand-400 border-t-transparent"
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 1.1, ease: "linear" }}
+                  />
+                )}
+                {isActive && (
+                  <motion.span
+                    className="absolute -inset-1.5 rounded-full border-2 border-brand-300/50"
+                    animate={{ scale: [1, 1.25, 1], opacity: [0.6, 0, 0.6] }}
+                    transition={{ repeat: Infinity, duration: 1.8 }}
+                  />
+                )}
                 {isDone ? "✓" : i + 1}
               </div>
               <div

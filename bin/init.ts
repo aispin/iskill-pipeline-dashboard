@@ -10,23 +10,25 @@ import {
 } from "node:fs";
 import { basename, join, resolve } from "node:path";
 
-function parseArgs(): { team: string; workspace: string; inject: boolean; force: boolean } {
+function parseArgs(): { team: string; workspace: string; inject: boolean; force: boolean; dirs?: string } {
   let team = "";
   let workspace = process.cwd();
   let inject = false;
   let force = false;
+  let dirs: string | undefined;
   const a = process.argv;
   for (let i = 2; i < a.length; i++) {
     if (a[i] === "--team") team = a[++i] ?? team;
     else if (a[i] === "--workspace") workspace = a[++i] ?? workspace;
     else if (a[i] === "--inject") inject = true;
     else if (a[i] === "--force") force = true;
+    else if (a[i] === "--dirs") dirs = a[++i] ?? dirs;
   }
   if (!team) {
-    console.error("用法：node --import tsx ../bin/init.ts --team <专家团插件目录> --workspace <工作区> [--inject] [--force]");
+    console.error("用法：node --import tsx ../bin/init.ts --team <专家团插件目录> --workspace <工作区> [--inject] [--force] [--dirs 目录1,目录2]");
     process.exit(1);
   }
-  return { team: resolve(team), workspace: resolve(workspace), inject, force };
+  return { team: resolve(team), workspace: resolve(workspace), inject, force, dirs };
 }
 
 // 极简 frontmatter 解析：取 name / displayName.zh / profession.zh（逐行状态机，兼容嵌套 YAML）
@@ -55,7 +57,9 @@ function parseAgentMd(file: string): { id: string; name: string; role: string } 
 
 const CONTRACT = `## 操盘台契约（iskill-pipeline-dashboard）
 
-1. 任务开始后台启动操盘台：cd /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/server && node --import tsx ../bin/dashboard.ts --workspace <工作区>；成功后读 <工作区>/.pipeline/dashboard.json 拿 url 告诉用户
+1. 启动（按宿主能力二选一，尽力而为）：
+   - WorkBuddy/CodeBuddy 系：run_in_background 执行 bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区>；轮询 <工作区>/.pipeline/dashboard.json（每 2 秒最多 15 秒）拿 url，拿到后立刻用 present_files 打开该 url（内置浏览器零点击）
+   - 其他宿主：nohup bash <dashboard 技能目录>/bin/start.sh --workspace <工作区> >/dev/null 2>&1 &；轮询拿 url 后用 open/xdg-open 打开系统浏览器，失败则把 url 打印给用户
 2. 确保 <工作区>/.pipeline/manifest.json 与本团队匹配（用 bin/init.ts 生成或手工维护）
 3. agent 唯一动作：向 <工作区>/.pipeline/events.jsonl 追加一行 JSON；phase 取值 = manifest.stages[].id
 4. 产物落 manifest.artifactDirs 声明的目录即自动上屏，无需上报
@@ -64,7 +68,7 @@ const CONTRACT = `## 操盘台契约（iskill-pipeline-dashboard）
 `;
 
 export async function run(): Promise<void> {
-  const { team, workspace, inject, force } = parseArgs();
+  const { team, workspace, inject, force, dirs } = parseArgs();
   const agentsDir = join(team, "agents");
   if (!existsSync(agentsDir)) {
     console.error(`[init] 未找到 agents 目录：${agentsDir}`);
@@ -103,7 +107,7 @@ export async function run(): Promise<void> {
     theme: "pink",
     stages: [] as { id: string; label: string }[],
     members,
-    artifactDirs: ["产物"],
+    artifactDirs: dirsOpt ? dirsOpt.split(",").map((s) => s.trim()).filter(Boolean) : ["产物"],
     decisionTitle: "团队请求你的决定",
   };
 
@@ -116,7 +120,7 @@ export async function run(): Promise<void> {
 
   console.log(`[init] 已生成 manifest：${manifestFile}`);
   console.log(`[init] 成员 ${members.length} 人（头像已复制到 .pipeline/assets/avatars/）`);
-  console.log("[init] ⚠️ 待人工补全：stages（阶段流水线，事件 phase 取值须与之对应）与 artifactDirs（产物目录）");
+  console.log(dirs ? "[init] artifactDirs 已按 --dirs 写入" : "[init] ⚠️ 待人工补全：stages（阶段流水线，事件 phase 取值须与之对应）；artifactDirs 可用 --dirs 目录1,目录2 指定（默认占位 产物/）");
 
   // 契约注入：找主理人 MD（文件名含 team-lead，否则第一个 agent）
   if (inject) {

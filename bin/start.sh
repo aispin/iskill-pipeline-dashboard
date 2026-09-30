@@ -16,6 +16,19 @@ while [ $# -gt 0 ]; do
 done
 [ -z "$WORKSPACE" ] && { echo "[start] 缺 --workspace <工作区绝对路径>"; exit 1; }
 
+# ⓪ 幂等复用：同工作区已有存活实例 → 直接报 url 退出（防旧实例僵尸化导致新旧 URL 混淆）
+DJ="$WORKSPACE/.pipeline/dashboard.json"
+if [ -f "$DJ" ]; then
+  PID="$(/usr/bin/sed -n 's/.*"pid"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$DJ" | head -1)"
+  WS="$(/usr/bin/sed -n 's/.*"workspace"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$DJ" | head -1)"
+  URL="$(/usr/bin/sed -n 's/.*"url"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$DJ" | head -1)"
+  if [ -n "$PID" ] && [ "$WS" = "$WORKSPACE" ] && kill -0 "$PID" 2>/dev/null; then
+    echo "[start] 工作区已有运行中的操盘台实例 (pid=$PID)：$URL"
+    echo "[start] 如代码有更新需重启：kill $PID 后重新运行本脚本"
+    exit 0
+  fi
+fi
+
 # ① 定位 node：PATH → WorkBuddy managed 目录兜底（非交互 shell 常无完整 PATH）
 NODE="$(command -v node 2>/dev/null || true)"
 if [ -z "$NODE" ]; then
