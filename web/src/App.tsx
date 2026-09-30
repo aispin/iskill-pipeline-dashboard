@@ -34,6 +34,12 @@ export default function App() {
   }, [manifest.theme]);
 
   useEffect(() => {
+    // 标题动态化：剥掉 manifest.name 尾部的「操盘台」后缀，拼成「操盘台-{团队/专家/技能名}」
+    const base = manifest.name.replace(/操盘台$/, "").trim();
+    document.title = base ? `操盘台-${base}` : manifest.name || "操盘台";
+  }, [manifest.name]);
+
+  useEffect(() => {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     const ws = new WebSocket(`${proto}://${location.host}/ws`);
     wsRef.current = ws;
