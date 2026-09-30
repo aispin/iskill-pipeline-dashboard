@@ -1,0 +1,15 @@
+{
+  "name": "视频剪辑操盘台",
+  "subtitle": "iskill-video-clipper · 单技能接入示例",
+  "theme": "blue",
+  "stages": [
+    { "id": "recon", "label": "素材侦察" },
+    { "id": "ref", "label": "参考分析" },
+    { "id": "storyboard", "label": "分镜表" },
+    { "id": "build", "label": "构建渲染" },
+    { "id": "accept", "label": "验收抽查" },
+    { "id": "deliver", "label": "交付" }
+  ],
+  "artifactDirs": ["成片", "素材"],
+  "decisionTitle": "请求你的决定"
+}

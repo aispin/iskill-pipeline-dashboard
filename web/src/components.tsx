@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { MEMBERS, PHASES, type Ev } from "./types";
+import { useState } from "react";
+import type { Ev, Manifest, ManifestMember } from "./types";
 
 const fmtTime = (ts: string) => {
   const d = new Date(ts);
@@ -18,11 +19,34 @@ function memberStatus(events: Ev[]) {
   return open;
 }
 
-export function TeamBar({ events }: { events: Ev[] }) {
-  const open = memberStatus(events);
+// 头像：无图 / 加载失败 → 首字占位圆（任何接入方开箱即用）
+export function Avatar({ member, className }: { member: ManifestMember; className: string }) {
+  const [broken, setBroken] = useState(false);
+  const src = member.avatar
+    ? /^https?:|^\/|\bavatars\b/.test(member.avatar)
+      ? member.avatar
+      : "/api/file?p=" + encodeURIComponent(member.avatar)
+    : null;
+  if (!src || broken) {
+    return (
+      <div className={className + " flex items-center justify-center rounded-full bg-brand-100 font-bold text-brand-700"}>
+        {member.name.slice(0, 1)}
+      </div>
+    );
+  }
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {MEMBERS.map((m) => {
+    <img src={src} alt={member.name} onError={() => setBroken(true)} className={className} />
+  );
+}
+
+export function TeamBar({ events, manifest }: { events: Ev[]; manifest: Manifest }) {
+  const members = manifest.members ?? [];
+  if (members.length === 0) return null;
+  const open = memberStatus(events);
+  const cols = members.length >= 4 ? "lg:grid-cols-4" : members.length === 3 ? "lg:grid-cols-3" : members.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-1";
+  return (
+    <div className={"grid grid-cols-1 gap-3 sm:grid-cols-2 " + cols}>
+      {members.map((m) => {
         const cur = open.get(m.id);
         return (
           <motion.div
@@ -30,14 +54,13 @@ export function TeamBar({ events }: { events: Ev[] }) {
             layout
             className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-zinc-200"
           >
-            <img
-              src={m.avatar}
-              alt={m.name}
-              className="h-12 w-12 rounded-full object-cover ring-2 ring-brand-200"
+            <Avatar
+              member={m}
+              className="h-12 w-12 shrink-0 object-cover ring-2 ring-brand-200"
             />
             <div className="min-w-0">
               <div className="font-semibold text-zinc-900">{m.name}</div>
-              <div className="truncate text-xs text-zinc-500">{m.role}</div>
+              {m.role && <div className="truncate text-xs text-zinc-500">{m.role}</div>}
               <div
                 className={
                   "mt-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs " +
@@ -65,20 +88,22 @@ export function TeamBar({ events }: { events: Ev[] }) {
   );
 }
 
-export function Timeline({ events }: { events: Ev[] }) {
+export function Timeline({ events, manifest }: { events: Ev[]; manifest: Manifest }) {
+  const stages = manifest.stages ?? [];
+  if (stages.length === 0) return null; // 无阶段感的接入方 → 隐藏时间线（极简模式）
   const started = new Set<string>();
   const done = new Set<string>();
   for (const e of events) {
     if (e.type === "phase_start" && e.phase) started.add(e.phase);
     if (e.type === "phase_end" && e.phase) done.add(e.phase);
-    if (e.type === "pipeline_done") PHASES.forEach((p) => done.add(p.id));
+    if (e.type === "pipeline_done") stages.forEach((p) => done.add(p.id));
   }
-  const activeIdx = PHASES.findIndex((p) => started.has(p.id) && !done.has(p.id));
+  const activeIdx = stages.findIndex((p) => started.has(p.id) && !done.has(p.id));
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-zinc-200">
       <div className="flex items-start">
-        {PHASES.map((p, i) => {
+        {stages.map((p, i) => {
           const isDone = done.has(p.id);
           const isActive = i === activeIdx;
           return (
@@ -158,7 +183,7 @@ export function EventFeed({ events }: { events: Ev[] }) {
       <div className="max-h-[520px] space-y-2.5 overflow-y-auto pr-1">
         {list.length === 0 && (
           <div className="py-10 text-center text-sm text-zinc-400">
-            等待团队开工…
+            等待开工…
           </div>
         )}
         {list.map((e, i) => {

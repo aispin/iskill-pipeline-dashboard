@@ -27,46 +27,26 @@ export interface Artifact {
   mtime?: number;
 }
 
-export const PHASES = [
-  { id: "intake", label: "需求收集" },
-  { id: "scout", label: "热点选题" },
-  { id: "teardown", label: "对标拆解" },
-  { id: "copy", label: "文案打磨" },
-  { id: "precheck", label: "合规预检" },
-  { id: "edit", label: "成片剪辑" },
-  { id: "deliver", label: "交付汇编" },
-] as const;
-
-export interface Member {
+// ---------- manifest（标准化接入层，来自服务端 .pipeline/manifest.json） ----------
+export interface ManifestStage {
   id: string;
-  name: string;
-  role: string;
-  avatar: string;
+  label: string;
 }
 
-export const MEMBERS: Member[] = [
-  {
-    id: "viral-video-team-team-lead",
-    name: "闻热点",
-    role: "内容操盘官 · 主理人",
-    avatar: "/avatars/viral-video-team-team-lead.png",
-  },
-  {
-    id: "gushunkou",
-    name: "顾顺口",
-    role: "爆款文案写手",
-    avatar: "/avatars/gushunkou.png",
-  },
-  {
-    id: "duweijin",
-    name: "杜违禁",
-    role: "合规质检官",
-    avatar: "/avatars/duweijin.png",
-  },
-  {
-    id: "jianchengpian",
-    name: "简成片",
-    role: "成片剪辑师",
-    avatar: "/avatars/jianchengpian.png",
-  },
-];
+export interface ManifestMember {
+  id: string;
+  name: string;
+  role?: string;
+  avatar?: string; // "/"开头=前端静态资源；其余=工作区相对路径（走 /api/file）
+}
+
+export interface Manifest {
+  name: string;
+  subtitle?: string;
+  logo?: string;
+  theme?: string;
+  stages?: ManifestStage[];
+  members?: ManifestMember[];
+  artifactDirs?: string[];
+  decisionTitle?: string;
+}

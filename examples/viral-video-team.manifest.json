@@ -1,0 +1,22 @@
+{
+  "name": "爆款短视频操盘台",
+  "subtitle": "六步流水线 · 实时直播",
+  "theme": "pink",
+  "stages": [
+    { "id": "intake", "label": "需求收集" },
+    { "id": "scout", "label": "热点选题" },
+    { "id": "teardown", "label": "对标拆解" },
+    { "id": "copy", "label": "文案打磨" },
+    { "id": "precheck", "label": "合规预检" },
+    { "id": "edit", "label": "成片剪辑" },
+    { "id": "deliver", "label": "交付汇编" }
+  ],
+  "members": [
+    { "id": "viral-video-team-team-lead", "name": "闻热点", "role": "内容操盘官 · 主理人" },
+    { "id": "gushunkou", "name": "顾顺口", "role": "爆款文案写手" },
+    { "id": "duweijin", "name": "杜违禁", "role": "合规质检官" },
+    { "id": "jianchengpian", "name": "简成片", "role": "成片剪辑师" }
+  ],
+  "artifactDirs": ["选题", "拆解", "文案", "成片", "素材"],
+  "decisionTitle": "团队请求你的决定"
+}

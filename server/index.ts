@@ -20,6 +20,44 @@ interface Ev {
   [k: string]: unknown;
 }
 
+// ---------- manifest（标准化接入层） ----------
+// 接入方在工作区 .pipeline/manifest.json 声明：名称/主题/阶段/成员/产物目录。
+// 无 manifest 时回落内置预设（viral-video-team），保持旧行为兼容。
+export interface Manifest {
+  name: string;
+  subtitle?: string;
+  logo?: string;
+  theme?: string; // pink|purple|teal|blue|amber|green|coral，缺省 pink
+  stages?: { id: string; label: string }[];
+  members?: { id: string; name: string; role?: string; avatar?: string }[];
+  artifactDirs?: string[];
+  decisionTitle?: string;
+}
+
+const BUILTIN_MANIFEST: Manifest = {
+  name: "爆款短视频操盘台",
+  subtitle: "六步流水线 · 实时直播",
+  theme: "pink",
+  logo: "/avatars/team.png",
+  stages: [
+    { id: "intake", label: "需求收集" },
+    { id: "scout", label: "热点选题" },
+    { id: "teardown", label: "对标拆解" },
+    { id: "copy", label: "文案打磨" },
+    { id: "precheck", label: "合规预检" },
+    { id: "edit", label: "成片剪辑" },
+    { id: "deliver", label: "交付汇编" },
+  ],
+  members: [
+    { id: "viral-video-team-team-lead", name: "闻热点", role: "内容操盘官 · 主理人", avatar: "/avatars/viral-video-team-team-lead.png" },
+    { id: "gushunkou", name: "顾顺口", role: "爆款文案写手", avatar: "/avatars/gushunkou.png" },
+    { id: "duweijin", name: "杜违禁", role: "合规质检官", avatar: "/avatars/duweijin.png" },
+    { id: "jianchengpian", name: "简成片", role: "成片剪辑师", avatar: "/avatars/jianchengpian.png" },
+  ],
+  artifactDirs: ["选题", "拆解", "文案", "成片", "素材"],
+  decisionTitle: "团队请求你的决定",
+};
+
 const KINDS: Record<string, string> = {
   ".md": "markdown",
   ".mp4": "video",
@@ -33,8 +71,6 @@ const KINDS: Record<string, string> = {
   ".srt": "text",
   ".txt": "text",
 };
-
-const CONTENT_DIRS = ["选题", "拆解", "文案", "成片", "素材"];
 
 function parseArgs(): { workspace: string; port: number } {
   let workspace = process.cwd();
@@ -52,9 +88,34 @@ export async function run(): Promise<void> {
   const pipeDir = join(workspace, ".pipeline");
   const eventsFile = join(pipeDir, "events.jsonl");
   const decisionsDir = join(pipeDir, "decisions");
+  const manifestFile = join(pipeDir, "manifest.json");
+
+  function loadManifest(): Manifest {
+    try {
+      const raw = JSON.parse(readFileSync(manifestFile, "utf8")) as Partial<Manifest>;
+      return {
+        name: raw.name || BUILTIN_MANIFEST.name,
+        subtitle: raw.subtitle,
+        logo: raw.logo,
+        theme: raw.theme || "pink",
+        stages: Array.isArray(raw.stages) ? raw.stages : [],
+        members: Array.isArray(raw.members) ? raw.members : [],
+        artifactDirs: Array.isArray(raw.artifactDirs) && raw.artifactDirs.length
+          ? raw.artifactDirs
+          : BUILTIN_MANIFEST.artifactDirs,
+        decisionTitle: raw.decisionTitle || "请求你的决定",
+      };
+    } catch {
+      return BUILTIN_MANIFEST; // 无 manifest / 解析失败 → 内置预设（旧行为）
+    }
+  }
+
+  let manifest = loadManifest();
+  const contentDirs = (): string[] => manifest.artifactDirs ?? BUILTIN_MANIFEST.artifactDirs!;
+
   mkdirSync(pipeDir, { recursive: true });
   mkdirSync(decisionsDir, { recursive: true });
-  for (const d of CONTENT_DIRS) mkdirSync(join(workspace, d), { recursive: true });
+  for (const d of contentDirs()) mkdirSync(join(workspace, d), { recursive: true });
   if (!existsSync(eventsFile)) writeFileSync(eventsFile, "");
 
   // ---------- state ----------
@@ -91,7 +152,7 @@ export async function run(): Promise<void> {
 
   function listArtifacts(): { path: string; kind: string; mtime: number }[] {
     const out: { path: string; kind: string; mtime: number }[] = [];
-    for (const d of CONTENT_DIRS) {
+    for (const d of contentDirs()) {
       const base = join(workspace, d);
       if (!existsSync(base)) continue;
       const walk = (dir: string): void => {
@@ -132,7 +193,7 @@ export async function run(): Promise<void> {
       if (buf.length < offset) {
         offset = 0; // 文件被截断/重置 → 从头读
         events = []; // 内存历史同步清空（前端会收到全新 snapshot）
-        broadcast({ type: "snapshot", events, artifacts: listArtifacts() });
+        broadcast({ type: "snapshot", manifest, events, artifacts: listArtifacts() });
       }
       if (buf.length <= offset) return;
       const chunk = buf.subarray(offset).toString("utf8");
@@ -156,9 +217,11 @@ export async function run(): Promise<void> {
   // ---------- http api ----------
   const app = express();
   app.use(express.json());
+  // 团队静态资源（init 脚手架复制的头像/logo 等）：/team-assets/avatars/xxx.png
+  app.use("/team-assets", express.static(join(pipeDir, "assets")));
 
   app.get("/api/state", (_req: Request, res: Response) => {
-    res.json({ workspace, events, artifacts: listArtifacts() });
+    res.json({ workspace, manifest, events, artifacts: listArtifacts() });
   });
 
   app.get("/api/file", (req: Request, res: Response) => {
@@ -220,7 +283,7 @@ export async function run(): Promise<void> {
   wss.on("connection", (ws: WebSocket) => {
     clients.add(ws);
     ws.send(
-      JSON.stringify({ type: "snapshot", events, artifacts: listArtifacts() })
+      JSON.stringify({ type: "snapshot", manifest, events, artifacts: listArtifacts() })
     );
     ws.on("close", () => clients.delete(ws));
     ws.on("error", () => clients.delete(ws));
@@ -230,7 +293,7 @@ export async function run(): Promise<void> {
   // 产物目录有新文件 → 服务端代写 artifact 事件进 events.jsonl（agent 无需上报产物）
   // 决策文件出现 → 代写 decision_resolved 事件
   const watcher = watch(
-    [eventsFile, decisionsDir, ...CONTENT_DIRS.map((d) => join(workspace, d))],
+    [eventsFile, decisionsDir, manifestFile, ...contentDirs().map((d) => join(workspace, d))],
     {
       ignoreInitial: true,
       awaitWriteFinish: { stabilityThreshold: 250, pollInterval: 50 },
@@ -240,6 +303,18 @@ export async function run(): Promise<void> {
     if (action !== "add" && action !== "change") return;
     if (resolve(full) === resolve(eventsFile)) {
       readNewEvents();
+      return;
+    }
+    // manifest 热更新：重载 → 追加监听新产物目录 → 全量快照广播
+    if (resolve(full) === resolve(manifestFile)) {
+      const oldDirs = new Set(contentDirs());
+      manifest = loadManifest();
+      const fresh = contentDirs().filter((d) => !oldDirs.has(d));
+      for (const d of fresh) {
+        mkdirSync(join(workspace, d), { recursive: true });
+        watcher.add(join(workspace, d));
+      }
+      broadcast({ type: "snapshot", manifest, events, artifacts: listArtifacts() });
       return;
     }
     const rel = relative(workspace, full);

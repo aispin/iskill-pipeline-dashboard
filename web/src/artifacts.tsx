@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { motion } from "framer-motion";
 import { fetchFileText, sendDecision } from "./api";
-import type { Artifact, Ev } from "./types";
+import type { Artifact, Ev, Manifest } from "./types";
 
 function fileUrl(p: string) {
   return "/api/file?p=" + encodeURIComponent(p);
@@ -95,7 +95,7 @@ export function ArtifactViewer({ artifacts }: { artifacts: Artifact[] }) {
   );
 }
 
-export function DecisionPanel({ events }: { events: Ev[] }) {
+export function DecisionPanel({ events, manifest }: { events: Ev[]; manifest: Manifest }) {
   const [chosen, setChosen] = useState<string | null>(null);
 
   const resolved = new Set(
@@ -129,7 +129,7 @@ export function DecisionPanel({ events }: { events: Ev[] }) {
         className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-zinc-200"
       >
         <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-brand-500">
-          团队请求你的决定
+          {manifest.decisionTitle ?? "请求你的决定"}
         </div>
         <div className="mb-4 text-lg font-bold text-zinc-900">
           {pending.title ?? "请选择"}

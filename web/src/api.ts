@@ -1,7 +1,8 @@
-import type { Artifact, Ev } from "./types";
+import type { Artifact, Ev, Manifest } from "./types";
 
 export async function fetchState(): Promise<{
   workspace: string;
+  manifest: Manifest;
   events: Ev[];
   artifacts: Artifact[];
 }> {
