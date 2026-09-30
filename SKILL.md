@@ -52,6 +52,7 @@ bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --worksp
 - 默认端口 5188，占用自动 +1（最多到 5197）
 - 首次使用前需构建前端一次：`cd web && npm install && npm run build`（本机已构建过则免）
 - **启动失败 → 静默跳过，绝不影响主流程**
+- **跨宿主兼容**：本节按 WorkBuddy/CodeBuddy 能力描述。其他宿主（Codex/Claude Code/OpenCode 等）：后台启动改用 `nohup bash <本技能目录>/bin/start.sh --workspace <工作区> >/dev/null 2>&1 &`；打开页面没有 present_files 时用 `open`（macOS）/`xdg-open`（Linux）走系统默认浏览器，再不行把 url 打印给用户。事件/决策/产物三个文件协议与宿主无关，全平台一致。
 
 ## 脚手架（新团队一键接入）
 
@@ -95,7 +96,9 @@ cat "<工作区>/.pipeline/decisions/<id>.json"   # 读 choice 继续；100 次(
 
 ```
 ## 操盘台契约（iskill-pipeline-dashboard）
-1. 任务开始用 run_in_background 执行：bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区>；随后轮询 <工作区>/.pipeline/dashboard.json（每 2 秒最多 15 秒）拿 url，**拿到后立刻用 present_files 打开该 url**（WorkBuddy 内置浏览器直接呈现，用户零点击），不要只吐链接
+1. 启动（按宿主能力二选一，尽力而为）：
+   - WorkBuddy/CodeBuddy 系：run_in_background 执行 bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区>；轮询 <工作区>/.pipeline/dashboard.json（每 2 秒最多 15 秒）拿 url，拿到后立刻用 present_files 打开该 url（内置浏览器零点击）
+   - 其他宿主：nohup bash <dashboard 技能目录>/bin/start.sh --workspace <工作区> >/dev/null 2>&1 &；轮询拿 url 后用 open/xdg-open 打开系统浏览器，失败则把 url 打印给用户
 2. 确保 <工作区>/.pipeline/manifest.json 与本团队匹配（用 bin/init.ts 生成或手工维护）
 3. agent 唯一动作：向 <工作区>/.pipeline/events.jsonl 追加一行 JSON；phase 取值 = manifest.stages[].id
 4. 产物落 manifest.artifactDirs 声明的目录即自动上屏，无需上报
