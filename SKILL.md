@@ -46,7 +46,8 @@ agent 侧**唯一动作是向 `<工作区>/.pipeline/events.jsonl` 追加一行 
 bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区绝对路径>
 ```
 
-- **agent 必须用 run_in_background 执行**（前台脚本，直接跑会阻塞会话），随后轮询读 `<工作区>/.pipeline/dashboard.json`（每 2 秒最多 15 秒）拿到 `url` 告诉用户
+- **agent 必须用 run_in_background 执行**（前台脚本，直接跑会阻塞会话），随后轮询读 `<工作区>/.pipeline/dashboard.json`（每 2 秒最多 15 秒）拿到 `url`
+- **拿到 url 后立刻用 present_files 工具打开它**（传 localhost url 会在 WorkBuddy 内置浏览器面板直接打开，用户零点击），不要只把网址写在回复里让用户手动点
 - start.sh 自愈式：自动定位 node（PATH → managed 目录兜底）、server 依赖缺失自动 npm install
 - 默认端口 5188，占用自动 +1（最多到 5197）
 - 首次使用前需构建前端一次：`cd web && npm install && npm run build`（本机已构建过则免）
@@ -94,7 +95,7 @@ cat "<工作区>/.pipeline/decisions/<id>.json"   # 读 choice 继续；100 次(
 
 ```
 ## 操盘台契约（iskill-pipeline-dashboard）
-1. 任务开始用 run_in_background 执行：bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区>；随后轮询 <工作区>/.pipeline/dashboard.json（每 2 秒最多 15 秒）拿 url 告诉用户
+1. 任务开始用 run_in_background 执行：bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区>；随后轮询 <工作区>/.pipeline/dashboard.json（每 2 秒最多 15 秒）拿 url，**拿到后立刻用 present_files 打开该 url**（WorkBuddy 内置浏览器直接呈现，用户零点击），不要只吐链接
 2. 确保 <工作区>/.pipeline/manifest.json 与本团队匹配（用 bin/init.ts 生成或手工维护）
 3. agent 唯一动作：向 <工作区>/.pipeline/events.jsonl 追加一行 JSON；phase 取值 = manifest.stages[].id
 4. 产物落 manifest.artifactDirs 声明的目录即自动上屏，无需上报
