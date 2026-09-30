@@ -29,7 +29,7 @@ agent 侧**唯一动作是向 `<工作区>/.pipeline/events.jsonl` 追加一行 
   "logo": "/avatars/team.png",
   "stages": [{"id": "scout", "label": "热点选题"}],
   "members": [{"id": "agent-id", "name": "成员名", "role": "角色", "avatar": "可选"}],
-  "artifactDirs": ["选题", "文案"],
+  "artifactDirs": ["viral-video-team-output/选题", "viral-video-team-output/文案"],
   "decisionTitle": "团队请求你的决定"
 }
 ```
@@ -67,7 +67,7 @@ node --import tsx ../bin/init.ts --team <专家团插件目录> --workspace <工
 {"ts":"<ISO时间>","type":"phase_start","phase":"scout","member":"<成员agent-id>","title":"热点选题中"}
 {"ts":"...","type":"phase_end","phase":"scout","member":"...","title":"热点选题","summary":"一句话结果"}
 {"ts":"...","type":"decision_request","id":"pick-teardown","phase":"teardown","title":"选一条对标参考","options":[{"id":"1","label":"卡片名","detail":"一句说明"}]}
-{"ts":"...","type":"pipeline_done","artifact":"成片/xxx.mp4"}
+{"ts":"...","type":"pipeline_done","artifact":"viral-video-team-output/成片/xxx.mp4"}
 {"ts":"...","type":"note","title":"任意提示"}
 ```
 

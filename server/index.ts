@@ -54,7 +54,13 @@ const BUILTIN_MANIFEST: Manifest = {
     { id: "duweijin", name: "杜违禁", role: "合规质检官", avatar: "/avatars/duweijin.png" },
     { id: "jianchengpian", name: "简成片", role: "成片剪辑师", avatar: "/avatars/jianchengpian.png" },
   ],
-  artifactDirs: ["选题", "拆解", "文案", "成片", "素材"],
+  artifactDirs: [
+    "viral-video-team-output/选题",
+    "viral-video-team-output/拆解",
+    "viral-video-team-output/文案",
+    "viral-video-team-output/成片",
+    "viral-video-team-output/素材",
+  ],
   decisionTitle: "团队请求你的决定",
 };
 
