@@ -78,20 +78,26 @@ const KINDS: Record<string, string> = {
   ".txt": "text",
 };
 
-function parseArgs(): { workspace: string; port: number } {
+function parseArgs(): { workspace: string; port: number; instance: string } {
   let workspace = process.cwd();
   let port = 5188;
+  let instance = "";
   const a = process.argv;
   for (let i = 2; i < a.length; i++) {
     if (a[i] === "--workspace") workspace = a[++i] ?? workspace;
     else if (a[i] === "--port") port = Number(a[++i]) || port;
+    else if (a[i] === "--instance") instance = (a[++i] ?? "").trim();
   }
-  return { workspace: resolve(workspace), port };
+  return { workspace: resolve(workspace), port, instance };
 }
 
 export async function run(): Promise<void> {
-  const { workspace, port: wantPort } = parseArgs();
-  const pipeDir = join(workspace, ".pipeline");
+  const { workspace, port: wantPort, instance } = parseArgs();
+  // 实例隔离：--instance <id> → 数据落 .pipeline/instances/<id>/（events/decisions/manifest/dashboard 各一份）；
+  // 不传 = 传统单实例布局（.pipeline/ 根），向后兼容
+  const pipeDir = instance
+    ? join(workspace, ".pipeline", "instances", instance)
+    : join(workspace, ".pipeline");
   const eventsFile = join(pipeDir, "events.jsonl");
   const decisionsDir = join(pipeDir, "decisions");
   const manifestFile = join(pipeDir, "manifest.json");
@@ -118,6 +124,24 @@ export async function run(): Promise<void> {
 
   let manifest = loadManifest();
   const contentDirs = (): string[] => manifest.artifactDirs ?? BUILTIN_MANIFEST.artifactDirs!;
+
+  // 实例间产物目录重叠告警（两个实例声明了同一目录 → 产物会在两边重复上屏）
+  if (instance) {
+    const instRoot = join(workspace, ".pipeline", "instances");
+    try {
+      for (const other of readdirSync(instRoot)) {
+        if (other === instance) continue;
+        try {
+          const om = JSON.parse(readFileSync(join(instRoot, other, "manifest.json"), "utf8")) as Partial<Manifest>;
+          const overlap = (om.artifactDirs ?? []).filter((d) => contentDirs().includes(d));
+          if (overlap.length)
+            console.warn(
+              `[dashboard] ⚠️ 实例 "${instance}" 与 "${other}" 的 artifactDirs 重叠：${overlap.join("、")}（产物会重复上屏，建议各实例用独立目录）`
+            );
+        } catch { /* other instance 无 manifest，跳过 */ }
+      }
+    } catch { /* instances 目录还不存在 */ }
+  }
 
   mkdirSync(pipeDir, { recursive: true });
   mkdirSync(decisionsDir, { recursive: true });
@@ -285,15 +309,9 @@ export async function run(): Promise<void> {
 
   // ---------- ws ----------
   const server = http.createServer(app);
-  const wss = new WebSocketServer({ server, path: "/ws" });
-  wss.on("connection", (ws: WebSocket) => {
-    clients.add(ws);
-    ws.send(
-      JSON.stringify({ type: "snapshot", manifest, events, artifacts: listArtifacts() })
-    );
-    ws.on("close", () => clients.delete(ws));
-    ws.on("error", () => clients.delete(ws));
-  });
+  // 注意：WebSocketServer 不能在这里挂载——EADDRINUSE 重试期间，ws 会把底层 server 的
+  // error 重抛到 WebSocketServer 实例上，无人监听直接崩进程，端口自动 +1 永远走不通。
+  // 必须等端口绑定成功后再 new（见下方 listen 段之后）。
 
   // ---------- watchers ----------
   // 产物目录有新文件 → 服务端代写 artifact 事件进 events.jsonl（agent 无需上报产物）
@@ -384,11 +402,22 @@ export async function run(): Promise<void> {
   }
   if (!bound) throw new Error("找不到可用端口（5188-5197 均被占用）");
 
+  // 端口绑定成功后再挂载 WebSocketServer（原因见上方 ws 段注释）
+  const wss = new WebSocketServer({ server, path: "/ws" });
+  wss.on("connection", (ws: WebSocket) => {
+    clients.add(ws);
+    ws.send(
+      JSON.stringify({ type: "snapshot", manifest, events, artifacts: listArtifacts() })
+    );
+    ws.on("close", () => clients.delete(ws));
+    ws.on("error", () => clients.delete(ws));
+  });
+
   const url = `http://localhost:${port}`;
   writeFileSync(
     join(pipeDir, "dashboard.json"),
     JSON.stringify(
-      { url, pid: process.pid, workspace, startedAt: new Date().toISOString() },
+      { url, pid: process.pid, workspace, instance: instance || "default", startedAt: new Date().toISOString() },
       null,
       2
     )

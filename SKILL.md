@@ -43,10 +43,11 @@ agent 侧**唯一动作是向 `<工作区>/.pipeline/events.jsonl` 追加一行 
 ## 启动（任务开始时后台执行）
 
 ```bash
-bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区绝对路径>
+bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区绝对路径> [--instance <实例id>]
 ```
 
-- **agent 必须用 run_in_background 执行**（前台脚本，直接跑会阻塞会话），随后轮询读 `<工作区>/.pipeline/dashboard.json`（每 2 秒最多 15 秒）拿到 `url`
+- **实例隔离**：同一工作区可有多个团队/技能同时接入。传 `--instance <id>` 后，该实例的 events/decisions/manifest/dashboard.json 全部落 `<工作区>/.pipeline/instances/<id>/`，互不串台（端口自动错开）；不传则用传统单实例布局（`.pipeline/` 根），向后兼容。多团队共存的工作区**必须**各用各的实例 id（惯例取团队目录名，如 `viral-video-team`），且各实例 manifest 的 artifactDirs 不要重叠（重叠时服务端会打警告）
+- **agent 必须用 run_in_background 执行**（前台脚本，直接跑会阻塞会话），随后轮询读实例目录下的 `dashboard.json`（每 2 秒最多 15 秒）拿到 `url`
 - **拿到 url 后立刻用 present_files 工具打开它**（传 localhost url 会在 WorkBuddy 内置浏览器面板直接打开，用户零点击），不要只把网址写在回复里让用户手动点
 - start.sh 自愈式：自动定位 node（PATH → managed 目录兜底）、server 依赖缺失自动 npm install
 - 默认端口 5188，占用自动 +1（最多到 5197）
@@ -58,7 +59,7 @@ bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --worksp
 
 ```bash
 cd /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/server
-node --import tsx ../bin/init.ts --team <专家团插件目录> --workspace <工作区> --inject
+node --import tsx ../bin/init.ts --team <专家团插件目录> --workspace <工作区> --instance <实例id> --dirs 目录1,目录2 --inject
 ```
 
 解析 `plugin.json` + `agents/*.md` 生成 manifest 初稿（成员/角色自动提取，头像自动关联插件目录内的 avatar）；`--inject` 把「操盘台契约」片段追加进团队主理人 MD（已存在则跳过）。生成后人工微调 stages 与 artifactDirs 即可。
@@ -96,13 +97,13 @@ cat "<工作区>/.pipeline/decisions/<id>.json"   # 读 choice 继续；100 次(
 
 ```
 ## 操盘台契约（iskill-pipeline-dashboard）
-1. 启动（按宿主能力二选一，尽力而为）：
-   - WorkBuddy/CodeBuddy 系：run_in_background 执行 bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区>；轮询 <工作区>/.pipeline/dashboard.json（每 2 秒最多 15 秒）拿 url，拿到后立刻用 present_files 打开该 url（内置浏览器零点击）
-   - 其他宿主：nohup bash <dashboard 技能目录>/bin/start.sh --workspace <工作区> >/dev/null 2>&1 &；轮询拿 url 后用 open/xdg-open 打开系统浏览器，失败则把 url 打印给用户
-2. 确保 <工作区>/.pipeline/manifest.json 与本团队匹配（用 bin/init.ts 生成或手工维护）
-3. agent 唯一动作：向 <工作区>/.pipeline/events.jsonl 追加一行 JSON；phase 取值 = manifest.stages[].id
-4. 产物落 manifest.artifactDirs 声明的目录即自动上屏，无需上报
-5. 决策：写 decision_request 事件 → 轮询 .pipeline/decisions/<id>.json（约5分钟超时回聊天询问）
+1. 启动（按宿主能力二选一，尽力而为；<实例id> 惯例取本团队/技能目录名）：
+   - WorkBuddy/CodeBuddy 系：run_in_background 执行 bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区> --instance <实例id>；轮询 <工作区>/.pipeline/instances/<实例id>/dashboard.json（每 2 秒最多 15 秒）拿 url，拿到后立刻用 present_files 打开该 url（内置浏览器零点击）
+   - 其他宿主：nohup bash <dashboard 技能目录>/bin/start.sh --workspace <工作区> --instance <实例id> >/dev/null 2>&1 &；轮询拿 url 后用 open/xdg-open 打开系统浏览器，失败则把 url 打印给用户
+2. 确保 <工作区>/.pipeline/instances/<实例id>/manifest.json 与本团队匹配（用 bin/init.ts --instance 生成或手工维护）
+3. agent 唯一动作：向 <工作区>/.pipeline/instances/<实例id>/events.jsonl 追加一行 JSON；phase 取值 = manifest.stages[].id
+4. 产物落 manifest.artifactDirs 声明的目录即自动上屏，无需上报；多实例共存时各实例 artifactDirs 不得重叠
+5. 决策：写 decision_request 事件 → 轮询 .pipeline/instances/<实例id>/decisions/<id>.json（约5分钟超时回聊天询问）
 6. 操盘台启动失败/不可用 → 静默降级为聊天内决策，绝不阻塞主流程
 ```
 
