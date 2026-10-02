@@ -100,13 +100,14 @@ window.PROMO = {
       steps: {
         eyebrow: "上手",
         title: "三步跑起来",
-        sub: "",
+        sub: "构建与起服务都由 agent 后台跑；只有决策必须你看。",
         items: [
           { title: "交给 AI 装", desc: "把这句话粘进对话框，agent 会自己拉代码、读文档，再告诉你用法。", codeKey: "install" },
-          { title: "首次构建前端", desc: "本机已构建过则免；之后服务端直接托管 web/dist。", codeName: "shell", code: "cd web && npm install && npm run build" },
-          { title: "拉起操盘台", desc: "传 --instance 做实例隔离，同一工作区可多团队并存、端口自动错开。", codeName: "shell", code: "bash bin/start.sh --workspace <工作区绝对路径> --instance <实例id>" }
+          { title: "让它接上流水线", desc: "manifest 里声明名称 / 阶段 / 成员就行；构建、起服务、端口分配都是它的事。", codeName: "prompt", code: "启动操盘台，把这个团队的流水线接进去，实时看进度和产物。" },
+          { title: "在页面上做决策", desc: "这一步只能你亲自看：进度、成员状态、产物精排都在页面上，你的决策会被 agent 接着消费。" }
         ]
       },
+
 
       faq: {
         eyebrow: "问答",
@@ -210,13 +211,14 @@ window.PROMO = {
       steps: {
         eyebrow: "Get started",
         title: "Up and running in three steps",
-        sub: "",
+        sub: "The agent builds and serves it in the background; only the decisions need you.",
         items: [
           { title: "Let your agent install it", desc: "Paste the line into the chat — it clones the repo, reads the docs, and tells you how to use it.", codeKey: "install" },
-          { title: "Build the frontend once", desc: "Skip if this machine has built it before; afterwards the server serves web/dist directly.", codeName: "shell", code: "cd web && npm install && npm run build" },
-          { title: "Start the dashboard", desc: "Pass --instance for instance isolation — several teams can share a workspace with ports offset automatically.", codeName: "shell", code: "bash bin/start.sh --workspace <absolute workspace path> --instance <instance-id>" }
+          { title: "Have it plug in the pipeline", desc: "Declare name / stages / members in the manifest; building, serving and port allocation are on it.", codeName: "prompt", code: "Start the dashboard and plug this team's pipeline into it — live progress and artifacts." },
+          { title: "Make the calls on the page", desc: "This one needs your eyes: progress, member status and polished artifacts live on the page, and your decisions feed straight back to the agent." }
         ]
       },
+
 
       faq: {
         eyebrow: "FAQ",
