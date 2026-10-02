@@ -37,15 +37,19 @@ window.PROMO = {
         meta2: "被专家团调用",
         meta3: "MIT 许可"
       },
-      terminal: {
-        title: "zsh — iskill-pipeline-dashboard",
-        lines: [
-          [{ t: "$ ", c: "p" }, { t: "bash .../iskill-pipeline-dashboard/bin/start.sh --workspace ./ws --instance viral-video-team", c: "k" }],
-          [{ t: "✓ ", c: "p" }, { t: "定位 node（PATH → managed 目录兜底）", c: "s" }],
-          [{ t: "✓ ", c: "p" }, { t: "操盘台已启动：http://127.0.0.1:5188", c: "s" }],
-          [{ t: "→ ", c: "p" }, { t: ".pipeline/instances/viral-video-team/dashboard.json 已写入 url", c: "s" }]
+      chat: {
+        title: "AI Agent · 对话现场",
+        status: "在线",
+        userLabel: "你",
+        agentLabel: "AI",
+        messages: [
+          { role: "user", text: "启动操盘台，把这个团队的流水线接进去" },
+          { role: "agent", text: "读 manifest.json 拿名称 / 阶段 / 成员 / 产物目录，构建服务端并起服务，端口自动错开；实时展示进度、成员状态与产物精排。", tag: "manifest 已接入" },
+          { role: "user", text: "我要在页面上改决策" },
+          { role: "agent", text: "可以——页面交互写回 events.jsonl，我这边接着消费，决策闭环是内置的。" }
         ]
       },
+
 
       stats: [
         { value: "1 行", label: "agent 侧唯一动作", note: "向 events.jsonl 追加一行 JSON，其余全自动" },
@@ -148,15 +152,19 @@ window.PROMO = {
         meta2: "launched by teams",
         meta3: "MIT licensed"
       },
-      terminal: {
-        title: "zsh — iskill-pipeline-dashboard",
-        lines: [
-          [{ t: "$ ", c: "p" }, { t: "bash .../iskill-pipeline-dashboard/bin/start.sh --workspace ./ws --instance viral-video-team", c: "k" }],
-          [{ t: "✓ ", c: "p" }, { t: "locating node (PATH → managed fallback)", c: "s" }],
-          [{ t: "✓ ", c: "p" }, { t: "dashboard up: http://127.0.0.1:5188", c: "s" }],
-          [{ t: "→ ", c: "p" }, { t: "wrote url to .pipeline/instances/viral-video-team/dashboard.json", c: "s" }]
+      chat: {
+        title: "AI Agent · live session",
+        status: "online",
+        userLabel: "You",
+        agentLabel: "AI",
+        messages: [
+          { role: "user", text: "Start the dashboard and plug this team's pipeline into it" },
+          { role: "agent", text: "I read manifest.json for name / stages / members / artifact dirs, build the server and serve it on an auto-assigned port. You get live progress, member status and polished artifacts.", tag: "manifest wired" },
+          { role: "user", text: "I want to make decisions on the page" },
+          { role: "agent", text: "That's built in — page interactions are written back to events.jsonl and I consume them on the next tick." }
         ]
       },
+
 
       stats: [
         { value: "1 line", label: "the agent's only action", note: "append one JSON line to events.jsonl; the rest is automatic" },
