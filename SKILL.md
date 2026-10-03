@@ -40,20 +40,34 @@ agent 侧**唯一动作是向 `<工作区>/.pipeline/events.jsonl` 追加一行 
 - **artifactDirs**：产物目录，自动创建+自动监听；manifest 修改保存后**热生效**（无需重启）
 - **无 manifest**：回落内置 viral-video-team 预设（六阶段/四成员/粉品红），旧用法完全兼容
 
-## 启动（任务开始时后台执行）
+## 启动（任务开始时拉起）
 
 ```bash
-bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区绝对路径> [--instance <实例id>]
+# 推荐：一条命令，真脱离后台 + 阻塞到就绪（最后一行 "OK <url>" / "FAIL <原因>"，退出码 0/1）
+bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh \
+     --workspace <工作区绝对路径> --instance <实例id> --detach
+
+# 已启动后只做就绪复核（pidfile + 端口双通道）
+bash .../start.sh --workspace <工作区> --instance <实例id> --wait [--timeout 40]
+
+# 或前台运行（由宿主内建后台机制包一层，如 run_in_background）
+bash .../start.sh --workspace <工作区绝对路径> [--instance <实例id>]
 ```
 
+- ⚠️ **别用 `start.sh ... &` / `nohup ... &`**（2026-10-02 实测根因）：普通 shell 后台任务会在**那次 Bash 调用结束时被连带杀掉**，而且死在「绑定端口、写 `dashboard.json` 之前」——于是 `dashboard.json` 永不出现，调用方按契约轮询必然超时 → 静默降级 → 操盘台全程不出现且无痕迹。宿主内建 `run_in_background` 等价有效（同一环境下实测稳定跑了 45 分钟）。
+- **两种「脱离」路径，按环境选**：
+  - **A（本机实测稳）**：宿主内建后台机制（WorkBuddy/CodeBuddy 的 `run_in_background`）起前台 `start.sh`，紧接着用 `start.sh --wait` 复核拿 `OK <url>`。
+  - **B（跨宿主通用）**：`--detach`，走 `bin/detach.mjs` 的 `spawn({detached:true})`（内部即 setsid）真脱离，阻塞到就绪后给 `OK <url>`。
+    ⚠️ **B 在本会话未完成实测**（验证过程中沙箱自身卡住，见下方备注）。若某环境对「脱离会话的孤儿进程」有额外限制，直接改用 A，功能等价。
+  - ⚠️ **脱离进程（setsid）这类操作会干扰沙箱的进程归属追踪**：本会话实测过一次 Python 双 fork + `setsid` 起后台进程后，**同一会话后续 Bash 调用连续 SIGTERM（exit 137）**，与记忆中 pnpm 场景同类。真要试 B，请在**可丢弃的会话**里试，别在正跑长任务的会话里试。
 - **实例隔离**：同一工作区可有多个团队/技能同时接入。传 `--instance <id>` 后，该实例的 events/decisions/manifest/dashboard.json 全部落 `<工作区>/.pipeline/instances/<id>/`，互不串台（端口自动错开）；不传则用传统单实例布局（`.pipeline/` 根），向后兼容。多团队共存的工作区**必须**各用各的实例 id（惯例取团队目录名，如 `viral-video-team`），且各实例 manifest 的 artifactDirs 不要重叠（重叠时服务端会打警告）
-- **agent 必须用 run_in_background 执行**（前台脚本，直接跑会阻塞会话），随后轮询读实例目录下的 `dashboard.json`（每 2 秒最多 15 秒）拿到 `url`
+- **输出契约**：stdout 最后一行恒为 `OK <url>` 或 `FAIL <原因>`（其余 `[start]` 诊断行走 stderr），便于调用方 grep 判定
 - **拿到 url 后立刻用 present_files 工具打开它**（传 localhost url 会在 WorkBuddy 内置浏览器面板直接打开，用户零点击），不要只把网址写在回复里让用户手动点
 - start.sh 自愈式：自动定位 node（PATH → managed 目录兜底）、server 依赖缺失自动 npm install
 - 默认端口 5188，占用自动 +1（最多到 5197）
 - 首次使用前需构建前端一次：`cd web && npm install && npm run build`（本机已构建过则免）
-- **启动失败 → 静默跳过，绝不影响主流程**
-- **跨宿主兼容**：本节按 WorkBuddy/CodeBuddy 能力描述。其他宿主（Codex/Claude Code/OpenCode 等）：后台启动改用 `nohup bash <本技能目录>/bin/start.sh --workspace <工作区> >/dev/null 2>&1 &`；打开页面没有 present_files 时用 `open`（macOS）/`xdg-open`（Linux）走系统默认浏览器，再不行把 url 打印给用户。事件/决策/产物三个文件协议与宿主无关，全平台一致。
+- **启动失败 → 不阻塞主流程，但必须显式通报用户**（成功报 url / 失败报原因），别静默不提
+- **跨宿主兼容**：「脱离 + 等就绪」由 `--detach` 自己完成，与宿主无关；打开页面没有 present_files 时用 `open`（macOS）/`xdg-open`（Linux）走系统默认浏览器，再不行把 url 打印给用户。事件/决策/产物三个文件协议与宿主无关，全平台一致。
 
 ## 脚手架（新团队一键接入）
 
@@ -95,16 +109,20 @@ cat "<工作区>/.pipeline/decisions/<id>.json"   # 读 choice 继续；100 次(
 
 ## 操盘台契约（注入团队/技能 MD 的标准片段）
 
+> 权威副本在 `bin/init.ts` 的 `CONTRACT` 常量（`--inject` 用它写 MD）；改契约请两边同步。
+
 ```
 ## 操盘台契约（iskill-pipeline-dashboard）
-1. 启动（按宿主能力二选一，尽力而为；<实例id> 惯例取本团队/技能目录名）：
-   - WorkBuddy/CodeBuddy 系：run_in_background 执行 bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区> --instance <实例id>；轮询 <工作区>/.pipeline/instances/<实例id>/dashboard.json（每 2 秒最多 15 秒）拿 url，拿到后立刻用 present_files 打开该 url（内置浏览器零点击）
-   - 其他宿主：nohup bash <dashboard 技能目录>/bin/start.sh --workspace <工作区> --instance <实例id> >/dev/null 2>&1 &；轮询拿 url 后用 open/xdg-open 打开系统浏览器，失败则把 url 打印给用户
+0. 定级：可选增强——没起来主流程照常跑，但启没起来必须显式通报用户（见第 6 条）
+1. 启动：一条命令 bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区> --instance <实例id> --detach
+   → 最后一行 OK <url>（失败 FAIL <原因>、退出码 1）；拿到 url 后立刻用 present_files 打开（内置浏览器零点击）
+   ⚠️ 别写 `start.sh ... &` / `nohup ... &`：那次 Bash 调用结束即被杀，且死在写 dashboard.json 之前，轮询必然超时（实测根因）
+   ⚠️ 复用宿主 run_in_background 时必须配 --wait 复核：start.sh --workspace <ws> --instance <id> --wait
 2. 确保 <工作区>/.pipeline/instances/<实例id>/manifest.json 与本团队匹配（用 bin/init.ts --instance 生成或手工维护）
 3. agent 唯一动作：向 <工作区>/.pipeline/instances/<实例id>/events.jsonl 追加一行 JSON；phase 取值 = manifest.stages[].id
 4. 产物落 manifest.artifactDirs 声明的目录即自动上屏，无需上报；多实例共存时各实例 artifactDirs 不得重叠
 5. 决策：写 decision_request 事件 → 轮询 .pipeline/instances/<实例id>/decisions/<id>.json（约5分钟超时回聊天询问）
-6. 操盘台启动失败/不可用 → 静默降级为聊天内决策，绝不阻塞主流程
+6. 启动失败/不可用 → 不阻塞主流程（回退聊天内决策），但必须显式通报用户：成功报「操盘台：已启动 <url>」，失败报「操盘台：本轮未启用（原因：…）」；排障看 FAIL 原因与 <实例目录>/server.log
 ```
 
 ## 技术栈与目录

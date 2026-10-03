@@ -59,14 +59,18 @@ function parseAgentMd(file: string): { id: string; name: string; role: string } 
 
 const CONTRACT = `## 操盘台契约（iskill-pipeline-dashboard）
 
-1. 启动（按宿主能力二选一，尽力而为；<实例id> 惯例取本团队目录名）：
-   - WorkBuddy/CodeBuddy 系：run_in_background 执行 bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区> --instance <实例id>；轮询 <工作区>/.pipeline/instances/<实例id>/dashboard.json（每 2 秒最多 15 秒）拿 url，拿到后立刻用 present_files 打开该 url（内置浏览器零点击）
-   - 其他宿主：nohup bash <dashboard 技能目录>/bin/start.sh --workspace <工作区> --instance <实例id> >/dev/null 2>&1 &；轮询拿 url 后用 open/xdg-open 打开系统浏览器，失败则把 url 打印给用户
+**定级：可选增强**——操盘台没起来，主流程照常跑；但**启没起来必须让用户知道**（见第 6 条）。
+
+1. 启动（两条路任选；A 本机实测稳，B 跨宿主通用）：<实例id> 惯例取本团队目录名
+   路 A：宿主内建后台机制（如 run_in_background）跑前台 \`start.sh --workspace <工作区> --instance <实例id>\`，紧接着 \`start.sh ... --wait\` 前台复核取结论
+   路 B：\`bash /Users/lv/.workbuddy/skills/iskill-pipeline-dashboard/bin/start.sh --workspace <工作区> --instance <实例id> --detach\`
+   两条路都以**最后一行 \`OK <url>\`**（失败 \`FAIL <原因>\`、退出码 1）给结论；拿到 url 后**立刻用 present_files 打开**（内置浏览器零点击），别只把网址写在回复里。
+   ⚠️ **不要写成 \`start.sh ... &\` / \`nohup ... &\`**——普通 shell 后台任务会在那次 Bash 调用结束时被连带杀掉，且死在写 dashboard.json 之前，导致轮询永远超时（已实测，2026-10-02 两轮实战零实例即此）。
 2. 确保 <工作区>/.pipeline/instances/<实例id>/manifest.json 与本团队匹配（用 bin/init.ts --instance 生成或手工维护）
 3. agent 唯一动作：向 <工作区>/.pipeline/instances/<实例id>/events.jsonl 追加一行 JSON；phase 取值 = manifest.stages[].id
 4. 产物落 manifest.artifactDirs 声明的目录即自动上屏，无需上报；多实例共存时各实例 artifactDirs 不得重叠
 5. 决策：写 decision_request 事件 → 轮询 .pipeline/instances/<实例id>/decisions/<id>.json（每 3 秒最多 5 分钟，超时回聊天询问）
-6. 操盘台启动失败/不可用 → 静默降级为聊天内决策，绝不阻塞主流程
+6. 启动失败/不可用 → **不阻塞主流程**（回退聊天内决策），但**必须显式通报用户**：成功报「操盘台：已启动 <url>」，失败报「操盘台：本轮未启用（原因：…）」。严禁静默不提。排障看 \`FAIL <原因>\` 与 <实例目录>/server.log
 `;
 
 export async function run(): Promise<void> {
@@ -111,7 +115,7 @@ export async function run(): Promise<void> {
     theme: "pink",
     stages: [] as { id: string; label: string }[],
     members,
-    artifactDirs: dirsOpt ? dirsOpt.split(",").map((s) => s.trim()).filter(Boolean) : ["产物"],
+    artifactDirs: dirs ? dirs.split(",").map((s) => s.trim()).filter(Boolean) : ["产物"],
     decisionTitle: "团队请求你的决定",
   };
 
