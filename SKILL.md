@@ -137,3 +137,15 @@ cat "<工作区>/.pipeline/decisions/<id>.json"   # 读 choice 继续；100 次(
 
 - 2026-09-30 v1（viral-video-team 专用）：决策往返 ✅；产物自动发现 ✅（隐藏目录已过滤）；事件流截断重置 ✅
 - 2026-09-30 v2 通用化：manifest 配置驱动（自定义名称/teal 主题/3 阶段/单成员/自定义产物目录 → /api/state 正确下发 ✅）；web 构建通过；无 manifest 回落内置预设
+
+## 依赖同步
+
+本仓库 `promo-page/assets/{app.js,style.css,icons.js}` 是 [iskill-promo-page](https://github.com/aispin/iskill-promo-page)
+模板引擎的 vendored 副本（锁定版本见 `package.json` 的 `iskillDeps`），**不要手改**——
+去真源仓库改并升 `@iskill-version`，再用 iskill-dep-sync 同步回来（本机无该工具时按下面自举）：
+
+```bash
+T="$HOME/.workbuddy/skills/iskill-dep-sync/scripts/skill-deps.mjs"
+[ -f "$T" ] || { TMP="$(mktemp -d)"; curl -fsSL "https://raw.githubusercontent.com/aispin/iskill-dep-sync/HEAD/scripts/skill-deps.mjs" -o "$TMP/skill-deps.mjs"; T="$TMP/skill-deps.mjs"; }
+node "$T" check "$(pwd)"     # 漂移检测；node "$T" sync "$(pwd)" 恢复/升级；node "$T" env "$(pwd)" 冷启动自检
+```
